@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#F1F1F8" />
+<meta name="description" content="วงล้อสุ่มรายชื่อและตัวเลข ใช้ได้แม้ไม่มีอินเทอร์เน็ต" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="วงล้อสุ่ม" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<title>วงล้อสุ่ม</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<style>
+  @font-face{font-family:'WheelSans';font-style:normal;font-weight:400 700;font-display:swap;src:url('fonts/Inter-Bold.subset.woff') format('woff');}
+  @font-face{font-family:'WheelSans';font-style:normal;font-weight:800 900;font-display:swap;src:url('fonts/Inter-ExtraBold.subset.woff') format('woff');}
+  [hidden]{display:none !important;}
+  :root{
+    --bg:#F1F1F8;
+    --card:#FFFFFF;
+    --ink:#14142B;
+    --muted:#6B6E8F;
+    --line:#E7E8F3;
+    --accent:#5F7BF3;
+    --accent-soft:rgba(95,123,243,.16);
+    --danger:#E5484D;
+    --shadow:0 6px 22px rgba(70,80,140,.12);
+    --font:'WheelSans','Noto Sans Thai','Leelawadee UI','Thonburi','Sarabun',Tahoma,system-ui,sans-serif;
+    --wheel:max(220px, min(calc(100vw - 28px), 600px, calc(100vh - 300px)));
+  }
+  @supports (height:100dvh){
+    :root{ --wheel:max(220px, min(calc(100vw - 28px), 600px, calc(100dvh - 300px))); }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    background-color:var(--bg);
+    background-size:220px 220px;
+    color:var(--ink);
+    font-family:var(--font);
+    overflow:hidden;
+    overscroll-behavior:none;
+  }
+  body.stars{background-image:var(--stars);}
+  button{font:inherit;color:inherit;cursor:pointer;}
+  button:disabled{cursor:not-allowed;}
+  :focus-visible{outline:3px solid #9DB0FF;outline-offset:2px;}
+  .icon-btn{
+    width:44px;height:44px;border:0;background:transparent;border-radius:50%;
+    display:grid;place-items:center;flex:none;transition:background .15s;
+  }
+  .icon-btn:hover{background:rgba(95,123,243,.1);}
+
+  /* ---------- main layout ---------- */
+  .app{
+    height:100vh;height:100dvh;
+    max-width:680px;margin:0 auto;
+    display:flex;flex-direction:column;
+    padding:max(10px, env(safe-area-inset-top)) 14px max(10px, env(safe-area-inset-bottom));
+  }
+  .topbar{display:flex;align-items:center;gap:6px;height:56px;flex:none;}
+  .title{
+    flex:1;min-width:0;margin:0;text-align:center;
+    font-weight:900;font-size:32px;line-height:1.35;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    cursor:pointer;padding:0 6px;
+  }
+  .result{
+    flex:none;align-self:center;
+    display:flex;align-items:center;justify-content:center;gap:12px;
+    min-height:64px;margin-top:6px;padding:10px 24px;border-radius:22px;
+    max-width:100%;
+    transition:background .2s, box-shadow .2s;
+  }
+  .result.has{background:var(--card);box-shadow:var(--shadow);}
+  .result-dot{width:14px;height:14px;border-radius:50%;flex:none;display:none;}
+  .result.has .result-dot{display:block;}
+  .result-label{font-size:12px;font-weight:700;color:var(--muted);line-height:1.3;}
+  .result:not(.has) .result-label{display:none;}
+  .result-value{font-size:30px;font-weight:900;line-height:1.3;word-break:break-word;}
+  .result:not(.has) .result-value{font-size:16px;font-weight:700;color:var(--muted);}
+  .result.pop{animation:pop .5s cubic-bezier(.2,1.4,.4,1);}
+  @keyframes pop{0%{transform:scale(.8);opacity:.3}100%{transform:scale(1);opacity:1}}
+
+  .wheel-area{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding-top:22px;}
+  .wheel-wrap{position:relative;width:var(--wheel);aspect-ratio:1/1;}
+  .wheel-wrap.rebuild{animation:rebuild .35s ease;}
+  @keyframes rebuild{0%{transform:scale(.965)}100%{transform:scale(1)}}
+  .wheel-shadow{position:absolute;inset:0;border-radius:50%;box-shadow:0 12px 34px rgba(60,70,130,.28);}
+  .wheel-svg{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  .wheel-svg text{font-family:var(--font);font-weight:800;text-rendering:geometricPrecision;}
+  .pointer{
+    position:absolute;top:-3.6%;left:50%;width:13%;z-index:3;
+    transform:translateX(-50%);transform-origin:50% 15%;
+    transition:transform .06s ease-out;
+    filter:drop-shadow(0 3px 5px rgba(40,50,100,.3));
+    pointer-events:none;
+  }
+  .hub{
+    position:absolute;left:50%;top:50%;width:21%;aspect-ratio:1/1;
+    transform:translate(-50%,-50%);
+    border-radius:50%;border:0;background:#F4F4FA;color:var(--ink);
+    box-shadow:0 0 0 5px rgba(255,255,255,.92), 0 4px 14px rgba(40,50,100,.18);
+    display:grid;place-items:center;z-index:4;
+    transition:transform .08s ease, opacity .2s;
+  }
+  .hub svg{width:38%;height:38%;}
+  .hub:active:not(:disabled){transform:translate(-50%,-50%) scale(.94);}
+  .hub:disabled{opacity:.5;}
+
+  .toolbar{
+    flex:none;align-self:center;display:flex;align-items:center;gap:6px;
+    background:var(--card);border-radius:999px;padding:8px 14px;
+    box-shadow:0 8px 26px rgba(70,80,140,.16);margin:6px 0 14px;
+  }
+  .tool{
+    position:relative;width:64px;height:52px;border:0;border-radius:999px;background:transparent;
+    display:grid;place-items:center;transition:background .15s, opacity .15s;
+  }
+  .tool:hover:not(:disabled){background:rgba(95,123,243,.1);}
+  .tool:disabled{opacity:.35;}
+  .tool.gold .disc{
+    width:48px;height:48px;border-radius:50%;background:#FFF1BF;color:#E09A00;
+    display:grid;place-items:center;
+  }
+  .badge{
+    position:absolute;top:2px;right:6px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;
+    background:var(--accent);color:#fff;font-size:12px;font-weight:800;display:none;place-items:center;
+  }
+  .badge.show{display:grid;}
+
+  /* ---------- panels ---------- */
+  .scrim{
+    position:fixed;inset:0;background:rgba(20,20,43,.5);z-index:30;
+    opacity:0;pointer-events:none;transition:opacity .25s;
+  }
+  .scrim.show{opacity:1;pointer-events:auto;}
+  .drawer{
+    position:fixed;top:0;bottom:0;width:min(90vw,430px);background:var(--bg);z-index:40;
+    display:flex;flex-direction:column;
+    padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+    transition:transform .28s cubic-bezier(.3,.8,.3,1);
+  }
+  .drawer.left{left:0;transform:translateX(-105%);border-radius:0 30px 30px 0;}
+  .drawer.right{right:0;transform:translateX(105%);border-radius:30px 0 0 30px;}
+  .drawer.open{transform:translateX(0);}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:14px 14px 8px;flex:none;}
+  .panel-head h2{margin:0;flex:1;text-align:center;font-size:30px;font-weight:900;line-height:1.35;}
+  .panel-body{flex:1;overflow-y:auto;padding:6px 16px 20px;-webkit-overflow-scrolling:touch;}
+  .panel-foot{flex:none;padding:10px 16px 16px;}
+  .section-label{margin:14px 6px 10px;color:var(--muted);font-weight:700;font-size:15px;}
+  .group-card{background:var(--card);border-radius:24px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+  .row{display:flex;align-items:center;gap:14px;padding:16px 18px;border-bottom:1px solid var(--line);font-weight:700;font-size:16px;cursor:pointer;}
+  .row:last-child{border-bottom:0;}
+  .row-label{flex:1;min-width:0;}
+  .row-select{
+    font:inherit;font-weight:800;border:0;background:transparent;color:var(--ink);
+    text-align:right;text-align-last:right;max-width:52%;padding:4px 0;cursor:pointer;
+    appearance:none;-webkit-appearance:none;
+  }
+  .row-btn{width:100%;border:0;background:transparent;text-align:left;}
+  .switch{
+    appearance:none;-webkit-appearance:none;width:52px;height:32px;border-radius:999px;
+    background:#D5D8EA;position:relative;cursor:pointer;flex:none;margin:0;border:0;transition:background .2s;
+  }
+  .switch::after{
+    content:'';position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;
+    background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25);
+  }
+  .switch:checked{background:var(--accent);}
+  .switch:checked::after{transform:translateX(20px);}
+
+  .search-box{display:none;padding:0 16px 8px;}
+  .search-box.show{display:block;}
+  .search-box input{
+    width:100%;padding:12px 16px;border-radius:16px;border:1.5px solid var(--line);
+    background:#fff;font:inherit;font-weight:600;
+  }
+  .wcard{
+    display:flex;align-items:center;gap:16px;background:var(--card);border-radius:24px;
+    padding:14px 12px 14px 16px;margin-bottom:14px;box-shadow:var(--shadow);cursor:pointer;
+    border:3px solid transparent;transition:border-color .15s;
+  }
+  .wcard.active{border-color:#A9B8FA;}
+  .thumb{flex:none;width:72px;height:72px;border-radius:50%;box-shadow:0 3px 10px rgba(60,70,130,.22);}
+  .thumb svg{display:block;}
+  .wname{flex:1;min-width:0;font-weight:800;font-size:19px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .wname small{display:block;color:var(--muted);font-weight:600;font-size:13px;}
+  .empty{color:var(--muted);text-align:center;padding:22px 8px;font-weight:600;}
+
+  .btn{
+    min-height:46px;padding:0 18px;border-radius:15px;border:1.5px solid var(--line);
+    background:#fff;font-weight:800;font-size:15px;transition:transform .08s, filter .15s;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff;}
+  .btn.wide{width:100%;min-height:54px;font-size:18px;border-radius:18px;}
+  .btn.ghost-danger{color:var(--danger);}
+
+  .sheet{
+    position:fixed;left:50%;bottom:0;width:min(100vw,600px);height:min(90vh,780px);height:min(90dvh,780px);
+    background:var(--bg);z-index:45;border-radius:30px 30px 0 0;display:flex;flex-direction:column;
+    transform:translate(-50%,105%);transition:transform .3s cubic-bezier(.3,.8,.3,1);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .sheet.open{transform:translate(-50%,0);}
+  .sheet .panel-head h2 small{font-size:14px;color:var(--muted);font-weight:700;margin-left:6px;}
+  .ed-card{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding:14px;display:flex;flex-direction:column;gap:12px;margin-bottom:14px;}
+  .ed-row{display:flex;gap:8px;align-items:center;}
+  .ed-row input[type=text],.ed-row input[type=number],.ed-card textarea{
+    flex:1;min-width:0;padding:11px 13px;border-radius:14px;border:1.5px solid var(--line);background:#F7F7FC;
+    font:inherit;font-weight:600;
+  }
+  .ed-row input[type=number]{flex:none;width:76px;text-align:center;}
+  .ed-row span{color:var(--muted);font-weight:700;font-size:14px;}
+  .ed-card textarea{width:100%;resize:vertical;}
+  .ed-card summary{cursor:pointer;font-weight:700;color:var(--muted);font-size:14px;padding:2px 0;}
+  .ed-card details[open] summary{margin-bottom:10px;}
+  .item-row{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:16px;padding:8px 8px 8px 12px;margin-bottom:8px;box-shadow:0 2px 8px rgba(70,80,140,.07);}
+  .item-row input[type=color]{
+    -webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer;flex:none;
+  }
+  .item-row input[type=color]::-webkit-color-swatch-wrapper{padding:0;}
+  .item-row input[type=color]::-webkit-color-swatch{border:2px solid rgba(20,20,43,.12);border-radius:50%;}
+  .item-row input[type=color]::-moz-color-swatch{border:2px solid rgba(20,20,43,.12);border-radius:50%;}
+  .item-row .lbl{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-weight:700;font-size:16px;padding:6px 4px;border-radius:8px;}
+  .item-row .lbl:focus{background:#F1F1F8;outline:0;}
+  .item-row .del{width:36px;height:36px;border:0;background:transparent;border-radius:50%;color:var(--muted);display:grid;place-items:center;}
+  .item-row .del:hover{color:var(--danger);background:rgba(229,72,77,.1);}
+  .foot-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .foot-actions .btn{flex:1;min-height:44px;font-size:14px;padding:0 10px;}
+
+  .modal-scrim{
+    position:fixed;inset:0;background:rgba(20,20,43,.5);z-index:60;display:none;
+    align-items:center;justify-content:center;padding:20px;
+  }
+  .modal-scrim.show{display:flex;}
+  .modal{background:#fff;border-radius:26px;width:min(100%,400px);padding:22px;box-shadow:0 20px 60px rgba(20,20,43,.35);animation:pop .28s cubic-bezier(.2,1.3,.4,1);}
+  .modal h3{margin:0 0 14px;font-size:22px;font-weight:900;line-height:1.4;}
+  .modal-msg{margin:0 0 6px;color:var(--muted);font-weight:600;line-height:1.5;}
+  .field{display:block;margin-bottom:12px;}
+  .field span{display:block;font-weight:700;font-size:14px;color:var(--muted);margin-bottom:6px;}
+  .field input{width:100%;padding:12px 14px;border-radius:14px;border:1.5px solid var(--line);background:#F7F7FC;font:inherit;font-weight:700;font-size:16px;}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
+  .modal-actions .btn{min-width:96px;}
+
+  .menu{
+    position:fixed;z-index:70;background:#fff;border-radius:18px;padding:6px;min-width:170px;
+    box-shadow:0 12px 34px rgba(20,20,43,.28);animation:pop .2s ease;
+  }
+  .menu button{
+    display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;padding:12px 14px;
+    border-radius:12px;font-weight:700;font-size:15px;text-align:left;
+  }
+  .menu button:hover:not(:disabled){background:#F1F1F8;}
+  .menu button.danger{color:var(--danger);}
+  .menu button:disabled{opacity:.4;}
+
+  .toast{
+    position:fixed;left:50%;bottom:110px;transform:translate(-50%,20px);z-index:80;
+    background:rgba(20,20,43,.92);color:#fff;padding:11px 20px;border-radius:999px;font-weight:700;font-size:14px;
+    opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;max-width:88vw;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  #confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:75;}
+
+  .group-card .row-btn + .row-btn{border-top:1px solid var(--line);}
+  .net-note{margin:0;padding:12px 18px 14px;color:var(--muted);font-size:13px;font-weight:600;line-height:1.5;border-top:1px solid var(--line);}
+  @media (max-width:420px){
+    .title{font-size:28px;}
+    .result-value{font-size:26px;}
+    .tool{width:58px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .result.pop,.wheel-wrap.rebuild,.modal,.menu{animation:none;}
+    .drawer,.sheet,.scrim{transition:none;}
+  }
+</style>
+</head>
+<body class="stars">
+
+<div class="app">
+  <header class="topbar">
+    <button class="icon-btn" id="openSettings" aria-label="ตั้งค่า"><i data-icon="gear" data-size="26"></i></button>
+    <h1 class="title" id="wheelTitle" role="button" tabindex="0" title="แตะเพื่อเปลี่ยนชื่อ">วงล้อ 1</h1>
+    <button class="icon-btn" id="openWheels" aria-label="วงล้อทั้งหมด"><i data-icon="menu" data-size="26"></i></button>
+  </header>
+
+  <section class="result" id="result" aria-live="polite">
+    <span class="result-dot" id="resultDot"></span>
+    <div>
+      <div class="result-label" id="resultLabel">ผลลัพธ์</div>
+      <div class="result-value" id="resultValue">แตะปุ่มตรงกลางเพื่อหมุน</div>
+    </div>
+  </section>
+
+  <main class="wheel-area">
+    <div class="wheel-wrap" id="wheelWrap">
+      <div class="wheel-shadow"></div>
+      <svg class="pointer" id="pointer" viewBox="0 0 100 90" aria-hidden="true">
+        <path d="M13 5H87Q99 5 93 16L57 79Q50 91 43 79L7 16Q1 5 13 5Z" fill="#fff"/>
+      </svg>
+      <svg class="wheel-svg" viewBox="0 0 400 400" aria-hidden="true">
+        <circle cx="200" cy="200" r="199" fill="#fff"/>
+        <g id="wheelGroup"></g>
+      </svg>
+      <button class="hub" id="hub" aria-label="หมุนวงล้อ"><span id="hubIcon"></span></button>
+    </div>
+  </main>
+
+  <nav class="toolbar" aria-label="เครื่องมือ">
+    <button class="tool gold" id="btnRestore" aria-label="เติมรายการที่ถูกเอาออกกลับมา"><span class="disc"><i data-icon="restore" data-size="26"></i></span><span class="badge" id="restoreBadge">0</span></button>
+    <button class="tool" id="btnAdd" aria-label="เพิ่มรายการ"><i data-icon="plus" data-size="30"></i></button>
+    <button class="tool" id="btnEdit" aria-label="แก้ไขรายการ"><i data-icon="pencil" data-size="26"></i></button>
+  </nav>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- settings drawer -->
+<aside class="drawer left" id="settingsDrawer" aria-label="ตั้งค่า">
+  <div class="panel-head">
+    <span style="width:44px"></span>
+    <h2>ตั้งค่า</h2>
+    <button class="icon-btn" data-close aria-label="ปิด"><i data-icon="x" data-size="26"></i></button>
+  </div>
+  <div class="panel-body">
+    <p class="section-label">ตั้งค่าของวงล้อนี้</p>
+    <div class="group-card">
+      <label class="row"><i data-icon="clock"></i><span class="row-label">ระยะเวลา</span><select class="row-select" id="setDuration"></select></label>
+      <label class="row"><i data-icon="zap"></i><span class="row-label">ความเร็ว</span><select class="row-select" id="setSpeed"></select></label>
+      <label class="row"><i data-icon="type"></i><span class="row-label">ขนาดตัวอักษร</span><select class="row-select" id="setFont"></select></label>
+      <label class="row"><i data-icon="stop"></i><span class="row-label">แตะเพื่อหยุด</span><input type="checkbox" class="switch" id="setStop"></label>
+      <label class="row"><i data-icon="check"></i><span class="row-label">เอาช่องที่ถูกสุ่มออก</span><input type="checkbox" class="switch" id="setRemove"></label>
+      <label class="row"><i data-icon="music"></i><span class="row-label">เพลงตอนหมุน</span><select class="row-select" id="setMusic"></select></label>
+      <label class="row"><i data-icon="volume"></i><span class="row-label">เสียงผลลัพธ์</span><select class="row-select" id="setResult"></select></label>
+    </div>
+    <div class="group-card">
+      <button class="row row-btn" id="resetSettings"><i data-icon="gear"></i><span class="row-label">คืนค่าเริ่มต้นของวงล้อนี้</span></button>
+    </div>
+    <p class="section-label">ทั้งแอป</p>
+    <div class="group-card">
+      <label class="row"><i data-icon="image"></i><span class="row-label">พื้นหลังลายดาว</span><input type="checkbox" class="switch" id="setStars"></label>
+      <label class="row"><i data-icon="award"></i><span class="row-label">กระดาษว่าวฉลองผล</span><input type="checkbox" class="switch" id="setConfetti"></label>
+      <label class="row"><i data-icon="phone"></i><span class="row-label">สั่นเมื่อได้ผล (มือถือ)</span><input type="checkbox" class="switch" id="setVibrate"></label>
+    </div>
+    <p class="section-label">ข้อมูลและการติดตั้ง</p>
+    <div class="group-card">
+      <button class="row row-btn" id="shareWheel"><i data-icon="share"></i><span class="row-label">แชร์วงล้อนี้ (ลิงก์)</span></button>
+      <button class="row row-btn" id="exportData"><i data-icon="download"></i><span class="row-label">สำรองข้อมูล (ดาวน์โหลดไฟล์)</span></button>
+      <button class="row row-btn" id="importData"><i data-icon="upload"></i><span class="row-label">นำเข้าจากไฟล์สำรอง</span></button>
+      <button class="row row-btn" id="installApp" hidden><i data-icon="phone"></i><span class="row-label">ติดตั้งเป็นแอปบนเครื่อง</span></button>
+      <p class="net-note" id="netNote"></p>
+    </div>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+  </div>
+</aside>
+
+<!-- wheels drawer -->
+<aside class="drawer right" id="wheelsDrawer" aria-label="วงล้อทั้งหมด">
+  <div class="panel-head">
+    <button class="icon-btn" data-close aria-label="ปิด"><i data-icon="x" data-size="26"></i></button>
+    <h2>วงล้อของฉัน</h2>
+    <button class="icon-btn" id="searchToggle" aria-label="ค้นหา"><i data-icon="search" data-size="24"></i></button>
+  </div>
+  <div class="search-box" id="searchBox"><input type="search" id="searchInput" placeholder="ค้นหาวงล้อ" /></div>
+  <div class="panel-body" id="wheelsList"></div>
+  <div class="panel-foot"><button class="btn primary wide" id="addWheel">เพิ่มวงล้อ</button></div>
+</aside>
+
+<!-- item editor -->
+<section class="sheet" id="editSheet" aria-label="แก้ไขรายการ">
+  <div class="panel-head">
+    <span style="width:44px"></span>
+    <h2>แก้ไขรายการ<small id="edCount"></small></h2>
+    <button class="icon-btn" data-close aria-label="ปิด"><i data-icon="x" data-size="26"></i></button>
+  </div>
+  <div class="panel-body">
+    <div class="ed-card">
+      <div class="ed-row">
+        <input type="text" id="edNew" placeholder="พิมพ์ชื่อหรือเลข แล้วกด Enter" maxlength="40" />
+        <button class="btn primary" id="edAdd">เพิ่ม</button>
+      </div>
+      <div class="ed-row">
+        <span>ชุดเลข</span>
+        <input type="number" id="edFrom" value="1" inputmode="numeric" />
+        <span>ถึง</span>
+        <input type="number" id="edTo" value="30" inputmode="numeric" />
+        <button class="btn" id="edRange">เพิ่มชุดเลข</button>
+      </div>
+      <details>
+        <summary>วางรายชื่อหลายบรรทัดพร้อมกัน</summary>
+        <textarea id="edBulk" rows="4" placeholder="1 บรรทัด = 1 รายการ"></textarea>
+        <div style="margin-top:8px"><button class="btn" id="edBulkAdd">เพิ่มทั้งหมด</button></div>
+      </details>
+    </div>
+    <div id="edList"></div>
+  </div>
+  <div class="panel-foot">
+    <div class="foot-actions">
+      <button class="btn" id="edShuffleColor">สุ่มสีใหม่</button>
+      <button class="btn" id="edShuffleOrder">สลับลำดับ</button>
+      <button class="btn ghost-danger" id="edClear">ล้างทั้งหมด</button>
+    </div>
+  </div>
+</section>
+
+<div class="modal-scrim" id="modalScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<canvas id="confetti"></canvas>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ================= pure helpers (unit-tested) ================= */
+  // <pure>
+  const mod = (a, n) => ((a % n) + n) % n;
+  const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+  const idxAt = (rot, n) => Math.min(n - 1, Math.floor(mod(-rot, 360) / (360 / n)));
+  const landMod = (idx, n, jitter) => {
+    const seg = 360 / n;
+    return mod(-(idx * seg + seg / 2 + jitter * seg), 360);
+  };
+  function planSpin(rotation, n, turns, idx, jitter){
+    const delta = mod(landMod(idx, n, jitter) - mod(rotation, 360), 360);
+    return rotation + turns * 360 + delta;
+  }
+  function planStop(anim, now, n, jitter){
+    const t = Math.min((now - anim.start) / anim.dur, 1);
+    const cur = anim.from + (anim.to - anim.from) * easeOutCubic(t);
+    const v = (anim.to - anim.from) * 3 * Math.pow(1 - t, 2) / anim.dur;
+    const seg = 360 / n;
+    const newDur = 1200;
+    const D = Math.max(v * newDur / 3, seg * 1.5);
+    const raw = cur + D;
+    const idx = idxAt(raw, n);
+    let d = mod(landMod(idx, n, jitter) - mod(raw, 360), 360);
+    if (d > 180) d -= 360;
+    return { anim: { from: cur, to: raw + d, start: now, dur: newDur }, idx: idx };
+  }
+  // </pure>
+
+  const $ = (s, r) => (r || document).querySelector(s);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  /* ================= icons ================= */
+  const ICONS = {
+    gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+    menu:'<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
+    refresh:'<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+    stop:'<rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" stroke="none"/>',
+    plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    pencil:'<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
+    x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    more:'<circle cx="12" cy="5" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="19" r="1.7" fill="currentColor"/>',
+    clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+    type:'<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>',
+    check:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+    music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    volume:'<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+    image:'<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+    award:'<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    phone:'<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+    restore:'<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+    copy:'<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+    trash:'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+    share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+    download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+    upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'
+  };
+  function svg(name, size, sw){
+    return '<svg viewBox="0 0 24 24" width="' + (size || 22) + '" height="' + (size || 22) + '" fill="none" stroke="currentColor" stroke-width="' + (sw || 2.2) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
+  }
+  document.querySelectorAll('[data-icon]').forEach(el => {
+    el.innerHTML = svg(el.dataset.icon, parseInt(el.dataset.size || '22', 10));
+    el.style.display = 'inline-flex';
+  });
+
+  /* faint star background */
+  (function(){
+    const P = 'M12 2.5l2.9 6.2 6.8.8-5 4.7 1.3 6.8L12 17.6 6 21l1.3-6.8-5-4.7 6.8-.8z';
+    const s = (x, y, k, r) => "<path d='" + P + "' transform='translate(" + x + " " + y + ") scale(" + k + ") rotate(" + r + " 12 12)'/>";
+    const tile = "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220' fill='none' stroke='rgba(110,120,180,0.15)' stroke-width='1.6' stroke-linejoin='round' vector-effect='non-scaling-stroke'>" +
+      s(10, 14, 2.6, -14) + s(128, 8, 1.4, 18) + s(74, 100, 3.4, 8) + s(160, 118, 1.8, -22) + s(18, 152, 1.5, 30) + s(120, 168, 2.2, -6) + "</svg>";
+    document.documentElement.style.setProperty('--stars', 'url("data:image/svg+xml,' + encodeURIComponent(tile) + '")');
+  })();
+
+  /* ================= data ================= */
+  const PALETTE = ['#6BAF5E','#8FE8B4','#E0503F','#F0A040','#F7D95A','#3F9A8A','#4A90E8','#6BBDF8','#6A3DB8','#7B4DF5','#EE6535','#9AC45D','#F26CA7','#D0DB5A'];
+  const DEFAULTS = { duration:4, speed:'fast', fontSize:24, stopOnTap:true, removeWinner:false, music:'intense1', resultSound:'cheer' };
+  const OPT_DURATION = [2,3,4,5,6,8,10,15,20].map(v => [v, v + ' วินาที']);
+  const OPT_SPEED = [['slow','ช้า'],['normal','ปกติ'],['fast','เร็ว']];
+  const OPT_FONT = []; for (let f = 14; f <= 40; f += 2) OPT_FONT.push([f, String(f)]);
+  const OPT_MUSIC = [['none','ปิด'],['tick','ติ๊กตามช่อง'],['intense1','เร้าใจ 1'],['intense2','เร้าใจ 2'],['upbeat','สนุกสนาน']];
+  const OPT_RESULT = [['none','ปิด'],['cheer','เสียงเชียร์'],['applause','ปรบมือ'],['fanfare','แตรฉลอง'],['chime','กระดิ่ง'],['arcade','อาร์เคด'],['tada','ตาด้า']];
+  const TURNS = { slow:4, normal:7, fast:11 };
+  const MAX_ITEMS = 300;
+  const STORE_KEY = 'spin-wheel-v2';
+
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  const textOn = hex => {
+    const n = parseInt(hex.slice(1), 16);
+    const l = (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255;
+    return l > 0.68 ? '#1E2140' : '#FFFFFF';
+  };
+  function pickColor(items){
+    const avoid = new Set();
+    if (items.length) { avoid.add(items[items.length - 1].color); avoid.add(items[0].color); }
+    const pool = PALETTE.filter(c => !avoid.has(c));
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function newItem(label, color){ return { id: uid(), label: String(label), color: color }; }
+  function makeWheel(name, labels){
+    const w = { id: uid(), name: name, items: [], removed: [], settings: Object.assign({}, DEFAULTS) };
+    labels.forEach(l => w.items.push(newItem(l, pickColor(w.items))));
+    return w;
+  }
+  function defaultState(){
+    const w = makeWheel('วงล้อ 1', Array.from({ length: 20 }, (_, i) => String(i + 1)));
+    return { wheels: [w], activeId: w.id, global: { stars: true, confetti: true, vibrate: true } };
+  }
+  function load(){
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && Array.isArray(s.wheels) && s.wheels.length) {
+          s.wheels = s.wheels.map(w => cleanWheel(w, false));
+          s.global = Object.assign({ stars: true, confetti: true, vibrate: true }, s.global || {});
+          if (!s.wheels.some(w => w.id === s.activeId)) s.activeId = s.wheels[0].id;
+          return s;
+        }
+      }
+    } catch (e) {}
+    return defaultState();
+  }
+  function save(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+
+  const state = load();
+  const W = () => state.wheels.find(w => w.id === state.activeId);
+
+  /* ================= elements ================= */
+  const wheelGroup = $('#wheelGroup'), wheelWrap = $('#wheelWrap'), pointer = $('#pointer');
+  const hub = $('#hub'), hubIcon = $('#hubIcon');
+  const result = $('#result'), resultDot = $('#resultDot'), resultLabel = $('#resultLabel'), resultValue = $('#resultValue');
+  const scrim = $('#scrim'), toastEl = $('#toast');
+  const settingsDrawer = $('#settingsDrawer'), wheelsDrawer = $('#wheelsDrawer'), editSheet = $('#editSheet');
+  [settingsDrawer, wheelsDrawer, editSheet].forEach(p => { p.inert = true; });
+
+  /* ================= wheel rendering ================= */
+  function polar(cx, cy, r, deg){
+    const a = (deg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+  function slice(cx, cy, r, a0, a1){
+    const p0 = polar(cx, cy, r, a0), p1 = polar(cx, cy, r, a1);
+    const large = (a1 - a0) > 180 ? 1 : 0;
+    return 'M' + cx + ' ' + cy + 'L' + p0[0].toFixed(2) + ' ' + p0[1].toFixed(2) + 'A' + r + ' ' + r + ' 0 ' + large + ' 1 ' + p1[0].toFixed(2) + ' ' + p1[1].toFixed(2) + 'Z';
+  }
+  let rotation = 0;
+  const applyRotation = () => wheelGroup.setAttribute('transform', 'rotate(' + rotation.toFixed(3) + ' 200 200)');
+
+  function labelMarkup(item, i, n, seg, fontSetting){
+    const R = 188;
+    const arcW = 2 * Math.PI * 120 * (seg / 360);
+    const fs = Math.max(8, Math.min(fontSetting, arcW * 0.78));
+    const maxChars = Math.max(2, Math.floor(112 / (fs * 0.6)));
+    const chars = Array.from(item.label);
+    const label = chars.length > maxChars ? chars.slice(0, maxChars - 1).join('') + '…' : item.label;
+    const mid = i * seg + seg / 2;
+    const p = polar(200, 200, R - 14, mid);
+    return '<text x="' + p[0].toFixed(2) + '" y="' + p[1].toFixed(2) + '" dy="0.35em" transform="rotate(' + (mid + 90).toFixed(2) + ' ' + p[0].toFixed(2) + ' ' + p[1].toFixed(2) + ')" font-size="' + fs.toFixed(1) + '" fill="' + textOn(item.color) + '">' + esc(label) + '</text>';
+  }
+
+  function renderWheel(){
+    const w = W(), items = w.items, n = items.length;
+    let html = '';
+    if (n === 0) {
+      html = '<circle cx="200" cy="200" r="188" fill="#E7E8F3"/>' +
+        '<text x="200" y="192" text-anchor="middle" font-size="20" fill="#8A8DAE">ยังไม่มีรายการ</text>' +
+        '<text x="200" y="222" text-anchor="middle" font-size="15" fill="#8A8DAE">แตะปุ่มดินสอด้านล่างเพื่อเพิ่ม</text>';
+    } else if (n === 1) {
+      html = '<circle cx="200" cy="200" r="188" fill="' + items[0].color + '"/>' + labelMarkup(items[0], 0, 1, 360, w.settings.fontSize);
+    } else {
+      const seg = 360 / n;
+      items.forEach((it, i) => {
+        html += '<path d="' + slice(200, 200, 188, i * seg, (i + 1) * seg) + '" fill="' + it.color + '" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/>';
+      });
+      items.forEach((it, i) => { html += labelMarkup(it, i, n, seg, w.settings.fontSize); });
+    }
+    wheelGroup.innerHTML = html;
+    applyRotation();
+  }
+
+  function thumbSvg(w){
+    const n = w.items.length;
+    let inner = '';
+    if (n === 0) inner = '<circle cx="50" cy="50" r="46" fill="#E1E3F0"/>';
+    else if (n === 1) inner = '<circle cx="50" cy="50" r="46" fill="' + w.items[0].color + '"/>';
+    else { const seg = 360 / n; w.items.forEach((it, i) => { inner += '<path d="' + slice(50, 50, 46, i * seg, (i + 1) * seg) + '" fill="' + it.color + '"/>'; }); }
+    return '<svg viewBox="0 0 100 100" width="72" height="72"><circle cx="50" cy="50" r="49.5" fill="#fff"/>' + inner + '<circle cx="50" cy="50" r="9" fill="#fff"/></svg>';
+  }
+
+  /* ================= audio ================= */
+  let AC = null, master = null;
+  function ensureAudio(){
+    try {
+      if (!AC) {
+        AC = new (window.AudioContext || window.webkitAudioContext)();
+        master = AC.createGain(); master.gain.value = 0.9; master.connect(AC.destination);
+      }
+      if (AC.state === 'suspended') AC.resume();
+    } catch (e) { AC = null; }
+    return AC;
+  }
+  function tone(freq, dur, type, vol, delay, slideTo){
+    if (!ensureAudio()) return;
+    const t0 = AC.currentTime + (delay || 0);
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.1, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(master);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function noise(dur, vol, delay, freq, q){
+    if (!ensureAudio()) return;
+    const t0 = AC.currentTime + (delay || 0);
+    const len = Math.max(1, Math.floor(AC.sampleRate * dur));
+    const buf = AC.createBuffer(1, len, AC.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const s = AC.createBufferSource(); s.buffer = buf;
+    const g = AC.createGain(); g.gain.setValueAtTime(vol || 0.1, t0);
+    let node = s;
+    if (freq) { const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q || 0.8; s.connect(f); node = f; }
+    node.connect(g); g.connect(master);
+    s.start(t0);
+  }
+  const kick = delay => tone(150, 0.16, 'sine', 0.3, delay || 0, 45);
+
+  const MUSIC = {
+    intense1: { ms: 120, step: i => {
+      const notes = [110, 110, 130.8, 110, 164.8, 110, 130.8, 98];
+      tone(notes[i % 8] * 2, 0.12, 'sawtooth', 0.05);
+      if (i % 4 === 0) kick();
+      if (i % 2 === 1) noise(0.04, 0.04, 0, 7000, 1);
+      if (i % 16 >= 8 && i % 2 === 0) tone(notes[Math.floor(i / 2) % 8] * 4, 0.08, 'square', 0.025);
+    } },
+    intense2: { ms: 85, step: i => {
+      noise(0.06, 0.05 + (i % 8) * 0.01, 0, 1800, 0.6);
+      if (i % 8 === 0) kick();
+      if (i % 16 === 0) tone(90, 0.5, 'sawtooth', 0.04, 0, 70);
+    } },
+    upbeat: { ms: 150, step: i => {
+      const scale = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+      const pat = [0, 2, 4, 2, 3, 5, 4, 2];
+      tone(scale[pat[i % 8]], 0.13, 'triangle', 0.07);
+      if (i % 2 === 0) tone(130.8 * (i % 8 < 4 ? 1 : 1.334), 0.16, 'sine', 0.09);
+      if (i % 4 === 2) noise(0.03, 0.04, 0, 6500, 1);
+    } }
+  };
+  let musicTimer = null, musicStep = 0;
+  function stopMusic(){ if (musicTimer) { clearInterval(musicTimer); musicTimer = null; } }
+  function startMusic(kind){
+    stopMusic();
+    const m = MUSIC[kind];
+    if (!m) return;
+    musicStep = 0;
+    m.step(musicStep++);
+    musicTimer = setInterval(() => m.step(musicStep++), m.ms);
+  }
+  function applause(n, spread, delay){
+    for (let i = 0; i < n; i++) {
+      noise(0.03 + Math.random() * 0.05, 0.05 + Math.random() * 0.09, (delay || 0) + Math.random() * (0.3 + spread), 1800 + Math.random() * 2200, 0.9);
+    }
+  }
+  function playResultSound(kind){
+    if (!kind || kind === 'none') return;
+    switch (kind) {
+      case 'applause': applause(46, 1.6); break;
+      case 'cheer':
+        [660, 880, 1100].forEach((f, i) => tone(f, 0.22, 'sine', 0.13, i * 0.1));
+        applause(40, 1.5, 0.25);
+        tone(1500, 0.35, 'sine', 0.05, 0.3, 2600);
+        tone(1800, 0.3, 'sine', 0.04, 0.55, 3000);
+        break;
+      case 'fanfare':
+        [[523.25,0,.12],[523.25,.13,.12],[523.25,.26,.12],[659.25,.39,.3],[783.99,.72,.3],[1046.5,1.05,.6]].forEach(n => {
+          tone(n[0], n[2] + 0.05, 'sawtooth', 0.07, n[1]);
+          tone(n[0] / 2, n[2] + 0.05, 'square', 0.04, n[1]);
+        });
+        break;
+      case 'chime':
+        [880, 1318.5, 1760].forEach((f, i) => { tone(f, 0.9, 'sine', 0.12, i * 0.12); tone(f * 2.01, 0.5, 'sine', 0.03, i * 0.12); });
+        break;
+      case 'arcade':
+        [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.16, 'square', 0.08, i * 0.07));
+        break;
+      case 'tada':
+        [261.6, 329.6, 392].forEach(f => tone(f, 0.7, 'triangle', 0.1, 0.05));
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, 0.25, 'sine', 0.09, 0.35 + i * 0.06));
+        noise(0.6, 0.06, 0.3, 5000, 0.6);
+        break;
+    }
+  }
+
+  /* ================= confetti ================= */
+  const cv = $('#confetti'), cctx = cv.getContext('2d');
+  let parts = [], cfRaf = 0;
+  function confettiBurst(){
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    const r = wheelWrap.getBoundingClientRect();
+    const ox = (r.left + r.width / 2) * dpr, oy = (r.top + r.height * 0.3) * dpr;
+    for (let i = 0; i < 90; i++) {
+      const a = Math.random() * Math.PI * 2, sp = (5 + Math.random() * 9) * dpr;
+      parts.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 7 * dpr, g: 0.32 * dpr,
+        w: (6 + Math.random() * 6) * dpr, h: (4 + Math.random() * 5) * dpr, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4,
+        c: PALETTE[i % PALETTE.length], life: 0, max: 90 + Math.random() * 50 });
+    }
+    if (!cfRaf) cfRaf = requestAnimationFrame(cfStep);
+  }
+  function cfStep(){
+    cctx.clearRect(0, 0, cv.width, cv.height);
+    parts = parts.filter(p => p.life < p.max);
+    parts.forEach(p => {
+      p.life++; p.vy += p.g; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      cctx.save(); cctx.translate(p.x, p.y); cctx.rotate(p.r);
+      cctx.globalAlpha = Math.max(0, 1 - p.life / p.max); cctx.fillStyle = p.c;
+      cctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); cctx.restore();
+    });
+    if (parts.length) cfRaf = requestAnimationFrame(cfStep);
+    else { cfRaf = 0; cctx.clearRect(0, 0, cv.width, cv.height); }
+  }
+
+  /* ================= toast / modal / panels ================= */
+  let toastTimer = 0;
+  function toast(msg){
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1900);
+  }
+
+  const modalScrim = $('#modalScrim'), modalTitle = $('#modalTitle'), modalBody = $('#modalBody'), modalActions = $('#modalActions');
+  function closeModal(){ modalScrim.classList.remove('show'); }
+  function openModal(o){
+    modalTitle.textContent = o.title;
+    const fields = o.fields || [];
+    modalBody.innerHTML = (o.message ? '<p class="modal-msg">' + esc(o.message) + '</p>' : '') + fields.map(f =>
+      '<label class="field"><span>' + esc(f.label) + '</span><input data-key="' + f.key + '" type="' + (f.type || 'text') + '" value="' + esc(f.value == null ? '' : f.value) + '"' +
+      (f.maxlength ? ' maxlength="' + f.maxlength + '"' : '') + (f.placeholder ? ' placeholder="' + esc(f.placeholder) + '"' : '') +
+      (f.inputmode ? ' inputmode="' + f.inputmode + '"' : '') + (f.clear ? ' data-clear="1"' : '') + '></label>').join('');
+    modalActions.innerHTML = '<button class="btn" data-a="cancel">' + esc(o.cancelText || 'ยกเลิก') + '</button>' +
+      (o.secondary ? '<button class="btn" data-a="alt">' + esc(o.secondary.text) + '</button>' : '') +
+      (o.confirmText === null ? '' : '<button class="btn ' + (o.danger ? 'danger' : 'primary') + '" data-a="ok">' + esc(o.confirmText || 'ตกลง') + '</button>');
+    modalScrim.classList.add('show');
+    const inputs = Array.from(modalBody.querySelectorAll('input'));
+    const values = () => { const v = {}; inputs.forEach(i => { v[i.dataset.key] = i.value; }); return v; };
+    const submit = () => {
+      const keep = o.onConfirm ? o.onConfirm(values()) === false : false;
+      if (keep) { inputs.forEach(i => { if (i.dataset.clear) i.value = ''; }); if (inputs[0]) inputs[0].focus(); }
+      else closeModal();
+    };
+    modalActions.onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.a === 'ok') submit();
+      else if (b.dataset.a === 'alt') { if (o.secondary && o.secondary.onClick) o.secondary.onClick(values()); }
+      else closeModal();
+    };
+    inputs.forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }));
+    setTimeout(() => { if (inputs[0]) { inputs[0].focus(); if (inputs[0].select) inputs[0].select(); } }, 40);
+  }
+  modalScrim.addEventListener('mousedown', e => { if (e.target === modalScrim) closeModal(); });
+
+  let openedPanel = null;
+  function openPanel(el){
+    closePanels();
+    el.inert = false; el.classList.add('open'); scrim.classList.add('show'); openedPanel = el;
+  }
+  function closePanels(){
+    if (openedPanel) { openedPanel.classList.remove('open'); openedPanel.inert = true; openedPanel = null; }
+    scrim.classList.remove('show');
+    stopPreviewMusic();
+  }
+  scrim.addEventListener('click', closePanels);
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closePanels));
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (modalScrim.classList.contains('show')) closeModal(); else closePanels();
+    closeMenu();
+  });
+
+  /* ================= spin logic ================= */
+  let spinning = false, stopping = false, anim = null, raf = 0;
+  let spinItems = 0, spinWheel = null, lastIdx = 0, lastTick = 0, pending = null;
+
+  function setResultIdle(text){
+    result.classList.remove('has', 'pop');
+    resultValue.textContent = text || 'แตะปุ่มตรงกลางเพื่อหมุน';
+  }
+  function showResult(item){
+    resultValue.textContent = item.label;
+    resultDot.style.background = item.color;
+    result.classList.remove('pop'); void result.offsetWidth;
+    result.classList.add('has', 'pop');
+  }
+  function renderHub(){
+    const w = W();
+    hubIcon.innerHTML = svg(spinning && w.settings.stopOnTap ? 'stop' : 'refresh', 40, 2.6);
+    hub.disabled = w.items.length === 0 || (spinning && !w.settings.stopOnTap);
+    hub.setAttribute('aria-label', spinning ? 'หยุดวงล้อ' : 'หมุนวงล้อ');
+  }
+  function renderToolbar(){
+    const w = W();
+    $('#btnRestore').disabled = spinning || w.removed.length === 0;
+    $('#btnAdd').disabled = spinning;
+    $('#btnEdit').disabled = spinning;
+    const badge = $('#restoreBadge');
+    badge.textContent = w.removed.length;
+    badge.classList.toggle('show', w.removed.length > 0);
+    renderHub();
+  }
+
+  function wiggle(){
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    pointer.style.transform = 'translateX(-50%) rotate(-11deg)';
+    setTimeout(() => { pointer.style.transform = 'translateX(-50%)'; }, 55);
+  }
+
+  function flushRemoval(){
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    const p = pending; pending = null;
+    applyRemoval(p.wheelId, p.itemId);
+  }
+  function applyRemoval(wheelId, itemId){
+    const w = state.wheels.find(x => x.id === wheelId); if (!w) return;
+    const it = w.items.find(x => x.id === itemId); if (!it) return;
+    w.items = w.items.filter(x => x.id !== itemId);
+    w.removed.push(it);
+    save();
+    if (w.id === state.activeId) {
+      renderWheel(); renderToolbar(); renderWheelsList();
+      wheelWrap.classList.remove('rebuild'); void wheelWrap.offsetWidth; wheelWrap.classList.add('rebuild');
+      toast('เอา "' + it.label + '" ออกจากวงล้อแล้ว');
+    }
+  }
+
+  function startSpin(){
+    flushRemoval();
+    const w = W(), n = w.items.length;
+    if (spinning || n === 0) return;
+    ensureAudio();
+    spinning = true; stopping = false; spinWheel = w; spinItems = n;
+    setResultIdle('กำลังหมุน…');
+    const idx = Math.floor(Math.random() * n);
+    const jitter = (Math.random() - 0.5) * 0.7;
+    const to = planSpin(rotation, n, TURNS[w.settings.speed] || 7, idx, jitter);
+    anim = { from: rotation, to: to, start: performance.now(), dur: w.settings.duration * 1000 };
+    lastIdx = idxAt(rotation, n);
+    startMusic(w.settings.music);
+    renderToolbar();
+    raf = requestAnimationFrame(frame);
+  }
+  function frame(now){
+    const t = Math.min((now - anim.start) / anim.dur, 1);
+    rotation = anim.from + (anim.to - anim.from) * easeOutCubic(t);
+    applyRotation();
+    const i = idxAt(rotation, spinItems);
+    if (i !== lastIdx) {
+      lastIdx = i;
+      if (now - lastTick > 45) {
+        lastTick = now; wiggle();
+        if (spinWheel.settings.music === 'tick') tone(1000, 0.03, 'square', 0.06);
+      }
+    }
+    if (t < 1) raf = requestAnimationFrame(frame); else finishSpin();
+  }
+  function stopNow(){
+    if (!spinning || stopping) return;
+    const now = performance.now();
+    if ((now - anim.start) / anim.dur > 0.85) return;
+    const plan = planStop(anim, now, spinItems, (Math.random() - 0.5) * 0.6);
+    anim = { from: plan.anim.from, to: plan.anim.to, start: plan.anim.start, dur: plan.anim.dur };
+    stopping = true;
+  }
+  function finishSpin(){
+    rotation = mod(anim.to, 360); applyRotation();
+    const w = spinWheel;
+    spinning = false; stopping = false; stopMusic();
+    const item = w.items[idxAt(rotation, spinItems)];
+    if (item) {
+      showResult(item);
+      playResultSound(w.settings.resultSound);
+      if (state.global.confetti) confettiBurst();
+      if (state.global.vibrate && navigator.vibrate) { try { navigator.vibrate([80, 40, 120]); } catch (e) {} }
+      if (w.settings.removeWinner) {
+        pending = { wheelId: w.id, itemId: item.id, timer: setTimeout(() => { const p = pending; pending = null; if (p) applyRemoval(p.wheelId, p.itemId); }, 1400) };
+      }
+    }
+    renderToolbar();
+  }
+  hub.addEventListener('click', () => {
+    if (spinning) { if (W().settings.stopOnTap) stopNow(); }
+    else startSpin();
+  });
+
+  /* ================= toolbar: restore / add / edit ================= */
+  function guardSpin(){ if (spinning) { toast('รอให้วงล้อหมุนเสร็จก่อนนะ'); return true; } return false; }
+
+  function addItems(labels){
+    const w = W(); let added = 0;
+    for (let k = 0; k < labels.length; k++) {
+      const t = String(labels[k]).trim();
+      if (!t) continue;
+      if (w.items.length >= MAX_ITEMS) { toast('เพิ่มได้สูงสุด ' + MAX_ITEMS + ' รายการ'); break; }
+      w.items.push(newItem(t.slice(0, 40), pickColor(w.items)));
+      added++;
+    }
+    save(); renderWheel(); renderToolbar(); renderWheelsList();
+    if (editSheet.classList.contains('open')) renderEditor();
+    return added;
+  }
+
+  $('#btnRestore').addEventListener('click', () => {
+    if (guardSpin()) return;
+    flushRemoval();
+    const w = W(); if (!w.removed.length) return;
+    const n = w.removed.length;
+    w.items = w.items.concat(w.removed); w.removed = [];
+    save(); renderWheel(); renderToolbar(); renderWheelsList();
+    toast('เติมกลับ ' + n + ' รายการแล้ว');
+  });
+  $('#btnAdd').addEventListener('click', () => {
+    if (guardSpin()) return;
+    flushRemoval();
+    openModal({
+      title: 'เพิ่มรายการ',
+      fields: [{ key: 'label', label: 'ชื่อหรือเลข', placeholder: 'พิมพ์แล้วกด Enter เพื่อเพิ่มต่อเนื่อง', maxlength: 40, clear: true }],
+      confirmText: 'เพิ่ม', cancelText: 'เสร็จสิ้น',
+      onConfirm: v => {
+        const t = (v.label || '').trim();
+        if (!t) return false;
+        addItems([t]); toast('เพิ่ม "' + t + '" แล้ว');
+        return false;
+      }
+    });
+  });
+  $('#btnEdit').addEventListener('click', () => {
+    if (guardSpin()) return;
+    flushRemoval();
+    renderEditor(); openPanel(editSheet);
+  });
+
+  /* ================= item editor ================= */
+  const edList = $('#edList');
+  function renderEditor(){
+    const w = W();
+    $('#edCount').textContent = w.items.length + ' รายการ';
+    edList.innerHTML = w.items.length ? w.items.map(it =>
+      '<div class="item-row" data-id="' + it.id + '"><input type="color" value="' + it.color + '" aria-label="สี"><input type="text" class="lbl" value="' + esc(it.label) + '" maxlength="40" aria-label="ชื่อรายการ"><button class="del" aria-label="ลบรายการ">' + svg('x', 18) + '</button></div>'
+    ).join('') : '<p class="empty">ยังไม่มีรายการ ลองเพิ่มด้านบนได้เลย</p>';
+  }
+  edList.addEventListener('input', e => {
+    const row = e.target.closest('.item-row'); if (!row) return;
+    const it = W().items.find(x => x.id === row.dataset.id); if (!it) return;
+    if (e.target.type === 'color') it.color = e.target.value;
+    else if (e.target.classList.contains('lbl')) it.label = e.target.value;
+    save(); renderWheel(); renderWheelsList();
+  });
+  edList.addEventListener('click', e => {
+    const del = e.target.closest('.del'); if (!del) return;
+    const id = del.closest('.item-row').dataset.id;
+    const w = W(); w.items = w.items.filter(x => x.id !== id);
+    save(); renderEditor(); renderWheel(); renderToolbar(); renderWheelsList();
+  });
+  const edNew = $('#edNew');
+  function edAddOne(){
+    const t = edNew.value.trim(); if (!t) return;
+    addItems([t]); edNew.value = ''; edNew.focus();
+    edList.parentElement.scrollTop = edList.parentElement.scrollHeight;
+  }
+  $('#edAdd').addEventListener('click', edAddOne);
+  edNew.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); edAddOne(); } });
+  $('#edRange').addEventListener('click', () => {
+    const from = parseInt($('#edFrom').value, 10), to = parseInt($('#edTo').value, 10);
+    if (isNaN(from) || isNaN(to) || from > to) { toast('ช่วงตัวเลขไม่ถูกต้อง'); return; }
+    if (to - from + 1 > MAX_ITEMS) { toast('เพิ่มได้ครั้งละไม่เกิน ' + MAX_ITEMS + ' รายการ'); return; }
+    const have = new Set(W().items.map(i => i.label));
+    const labels = [];
+    for (let n = from; n <= to; n++) if (!have.has(String(n))) labels.push(String(n));
+    const added = addItems(labels);
+    toast(added ? 'เพิ่ม ' + added + ' รายการแล้ว' : 'มีตัวเลขเหล่านี้อยู่แล้ว');
+  });
+  $('#edBulkAdd').addEventListener('click', () => {
+    const lines = $('#edBulk').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const added = addItems(lines);
+    $('#edBulk').value = '';
+    toast('เพิ่ม ' + added + ' รายการแล้ว');
+  });
+  function recolor(items){
+    items.forEach((it, i) => {
+      const avoid = new Set();
+      if (i > 0) avoid.add(items[i - 1].color);
+      if (i === items.length - 1 && items.length > 2) avoid.add(items[0].color);
+      const pool = PALETTE.filter(c => !avoid.has(c));
+      it.color = pool[Math.floor(Math.random() * pool.length)];
+    });
+  }
+  $('#edShuffleColor').addEventListener('click', () => {
+    recolor(W().items); save(); renderEditor(); renderWheel(); renderWheelsList(); toast('สุ่มสีใหม่แล้ว');
+  });
+  $('#edShuffleOrder').addEventListener('click', () => {
+    const a = W().items;
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+    save(); renderEditor(); renderWheel(); renderWheelsList(); toast('สลับลำดับแล้ว');
+  });
+  $('#edClear').addEventListener('click', () => {
+    if (!W().items.length) return;
+    openModal({
+      title: 'ล้างรายการทั้งหมด?', message: 'รายการทั้งหมดในวงล้อ "' + W().name + '" จะถูกลบ', confirmText: 'ล้างทั้งหมด', danger: true,
+      onConfirm: () => { const w = W(); w.items = []; w.removed = []; save(); renderEditor(); renderWheel(); renderToolbar(); renderWheelsList(); }
+    });
+  });
+
+  /* ================= wheels drawer ================= */
+  const wheelsList = $('#wheelsList'), searchBox = $('#searchBox'), searchInput = $('#searchInput');
+  function renderWheelsList(){
+    const q = searchInput.value.trim().toLowerCase();
+    const list = state.wheels.filter(w => !q || w.name.toLowerCase().includes(q));
+    wheelsList.innerHTML = list.length ? list.map(w =>
+      '<div class="wcard' + (w.id === state.activeId ? ' active' : '') + '" data-id="' + w.id + '"><div class="thumb">' + thumbSvg(w) + '</div><div class="wname">' + esc(w.name) + '<small>' + w.items.length + ' รายการ</small></div><button class="icon-btn" data-more="' + w.id + '" aria-label="เมนูของ ' + esc(w.name) + '">' + svg('more', 22) + '</button></div>'
+    ).join('') : '<p class="empty">ไม่พบวงล้อ</p>';
+  }
+  $('#searchToggle').addEventListener('click', () => {
+    searchBox.classList.toggle('show');
+    if (searchBox.classList.contains('show')) searchInput.focus(); else { searchInput.value = ''; renderWheelsList(); }
+  });
+  searchInput.addEventListener('input', renderWheelsList);
+
+  function switchWheel(id){
+    if (guardSpin()) return;
+    flushRemoval();
+    state.activeId = id; rotation = 0; save();
+    renderAll(); closePanels();
+  }
+  wheelsList.addEventListener('click', e => {
+    const more = e.target.closest('[data-more]');
+    if (more) { e.stopPropagation(); showMenu(more, more.dataset.more); return; }
+    const card = e.target.closest('.wcard');
+    if (card) switchWheel(card.dataset.id);
+  });
+
+  function closeMenu(){ const m = $('#ctxMenu'); if (m) m.remove(); }
+  function showMenu(btn, wid){
+    closeMenu();
+    const r = btn.getBoundingClientRect();
+    const m = document.createElement('div'); m.className = 'menu'; m.id = 'ctxMenu';
+    m.innerHTML = '<button data-a="rename">' + svg('pencil', 18) + 'เปลี่ยนชื่อ</button><button data-a="dup">' + svg('copy', 18) + 'ทำสำเนา</button><button data-a="del" class="danger"' + (state.wheels.length < 2 ? ' disabled' : '') + '>' + svg('trash', 18) + 'ลบ</button>';
+    document.body.appendChild(m);
+    const mw = m.offsetWidth, mh = m.offsetHeight;
+    m.style.left = Math.min(Math.max(8, r.right - mw), innerWidth - mw - 8) + 'px';
+    let top = r.bottom + 6; if (top + mh > innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+    m.style.top = top + 'px';
+    m.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b || b.disabled) return;
+      closeMenu(); wheelAction(b.dataset.a, wid);
+    });
+    setTimeout(() => document.addEventListener('click', closeMenu, { once: true }), 0);
+  }
+  function wheelAction(action, id){
+    if (guardSpin()) return;
+    flushRemoval();
+    const w = state.wheels.find(x => x.id === id); if (!w) return;
+    if (action === 'rename') {
+      openModal({ title: 'เปลี่ยนชื่อวงล้อ', fields: [{ key: 'name', label: 'ชื่อวงล้อ', value: w.name, maxlength: 30 }], confirmText: 'บันทึก',
+        onConfirm: v => { const t = (v.name || '').trim(); if (!t) return false; w.name = t; save(); renderTitle(); renderWheelsList(); } });
+    } else if (action === 'dup') {
+      const copy = { id: uid(), name: w.name + ' (สำเนา)', items: w.items.map(i => ({ id: uid(), label: i.label, color: i.color })), removed: w.removed.map(i => ({ id: uid(), label: i.label, color: i.color })), settings: Object.assign({}, w.settings) };
+      state.wheels.splice(state.wheels.indexOf(w) + 1, 0, copy); save(); renderWheelsList(); toast('ทำสำเนาแล้ว');
+    } else if (action === 'del') {
+      if (state.wheels.length < 2) return;
+      openModal({ title: 'ลบวงล้อนี้?', message: '"' + w.name + '" จะถูกลบถาวร', confirmText: 'ลบ', danger: true,
+        onConfirm: () => {
+          state.wheels = state.wheels.filter(x => x.id !== id);
+          if (state.activeId === id) { state.activeId = state.wheels[0].id; rotation = 0; }
+          save(); renderAll();
+        } });
+    }
+  }
+  $('#addWheel').addEventListener('click', () => {
+    if (guardSpin()) return;
+    flushRemoval();
+    openModal({
+      title: 'เพิ่มวงล้อใหม่',
+      fields: [
+        { key: 'name', label: 'ชื่อวงล้อ', value: 'วงล้อ ' + (state.wheels.length + 1), maxlength: 30 },
+        { key: 'count', label: 'สร้างเลข 1 ถึง (ไม่ใส่ก็ได้)', type: 'number', inputmode: 'numeric', placeholder: 'เช่น 30' }
+      ],
+      confirmText: 'สร้าง',
+      onConfirm: v => {
+        const name = (v.name || '').trim() || ('วงล้อ ' + (state.wheels.length + 1));
+        let cnt = parseInt(v.count, 10); if (isNaN(cnt) || cnt < 0) cnt = 0; cnt = Math.min(cnt, MAX_ITEMS);
+        const w = makeWheel(name, Array.from({ length: cnt }, (_, i) => String(i + 1)));
+        state.wheels.push(w); state.activeId = w.id; rotation = 0; save();
+        renderAll(); closePanels();
+        if (!cnt) toast('วงล้อว่าง แตะดินสอเพื่อเพิ่มรายการ');
+      }
+    });
+  });
+  $('#openWheels').addEventListener('click', () => { renderWheelsList(); openPanel(wheelsDrawer); });
+
+  /* ================= title ================= */
+  const titleEl = $('#wheelTitle');
+  function renderTitle(){ titleEl.textContent = W().name; document.title = W().name + ' · วงล้อสุ่ม'; }
+  const renameActive = () => wheelAction('rename', state.activeId);
+  titleEl.addEventListener('click', renameActive);
+  titleEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); renameActive(); } });
+
+  /* ================= settings drawer ================= */
+  function fillSelect(sel, opts){ sel.innerHTML = opts.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join(''); }
+  fillSelect($('#setDuration'), OPT_DURATION);
+  fillSelect($('#setSpeed'), OPT_SPEED);
+  fillSelect($('#setFont'), OPT_FONT);
+  fillSelect($('#setMusic'), OPT_MUSIC);
+  fillSelect($('#setResult'), OPT_RESULT);
+
+  let previewTimer = 0;
+  function stopPreviewMusic(){ clearTimeout(previewTimer); if (!spinning) stopMusic(); }
+  function previewMusic(kind){
+    if (spinning) return;
+    stopPreviewMusic(); ensureAudio();
+    if (kind === 'tick') { tone(1000, 0.03, 'square', 0.06); setTimeout(() => tone(1000, 0.03, 'square', 0.06), 160); return; }
+    startMusic(kind);
+    previewTimer = setTimeout(() => { if (!spinning) stopMusic(); }, 2200);
+  }
+
+  function renderSettings(){
+    const s = W().settings, g = state.global;
+    $('#setDuration').value = String(s.duration);
+    $('#setSpeed').value = s.speed;
+    $('#setFont').value = String(s.fontSize);
+    $('#setStop').checked = !!s.stopOnTap;
+    $('#setRemove').checked = !!s.removeWinner;
+    $('#setMusic').value = s.music;
+    $('#setResult').value = s.resultSound;
+    $('#setStars').checked = !!g.stars;
+    $('#setConfetti').checked = !!g.confetti;
+    $('#setVibrate').checked = !!g.vibrate;
+    document.body.classList.toggle('stars', !!g.stars);
+  }
+  function bindSetting(id, key, read, after){
+    $(id).addEventListener('change', e => { W().settings[key] = read(e.target); save(); if (after) after(W().settings[key]); });
+  }
+  bindSetting('#setDuration', 'duration', el => parseInt(el.value, 10));
+  bindSetting('#setSpeed', 'speed', el => el.value);
+  bindSetting('#setFont', 'fontSize', el => parseInt(el.value, 10), () => renderWheel());
+  bindSetting('#setStop', 'stopOnTap', el => el.checked, () => renderHub());
+  bindSetting('#setRemove', 'removeWinner', el => el.checked);
+  bindSetting('#setMusic', 'music', el => el.value, v => previewMusic(v));
+  bindSetting('#setResult', 'resultSound', el => el.value, v => playResultSound(v));
+  [['#setStars', 'stars'], ['#setConfetti', 'confetti'], ['#setVibrate', 'vibrate']].forEach(p => {
+    $(p[0]).addEventListener('change', e => {
+      state.global[p[1]] = e.target.checked; save();
+      if (p[1] === 'stars') document.body.classList.toggle('stars', e.target.checked);
+      if (p[1] === 'vibrate' && e.target.checked && navigator.vibrate) { try { navigator.vibrate(60); } catch (err) {} }
+      if (p[1] === 'confetti' && e.target.checked) confettiBurst();
+    });
+  });
+  $('#resetSettings').addEventListener('click', () => {
+    W().settings = Object.assign({}, DEFAULTS); save(); renderSettings(); renderWheel(); renderHub(); toast('คืนค่าเริ่มต้นแล้ว');
+  });
+  $('#openSettings').addEventListener('click', () => { renderSettings(); updateNetNote(); refreshInstallRow(); openPanel(settingsDrawer); });
+
+  /* ================= share / backup / install / offline ================= */
+  function cleanSettings(s){
+    const out = Object.assign({}, DEFAULTS);
+    if (!s || typeof s !== 'object') return out;
+    Object.keys(DEFAULTS).forEach(k => { if (typeof s[k] === typeof DEFAULTS[k]) out[k] = s[k]; });
+    out.duration = Math.min(20, Math.max(2, Number(out.duration) || DEFAULTS.duration));
+    out.fontSize = Math.min(60, Math.max(8, Number(out.fontSize) || DEFAULTS.fontSize));
+    return out;
+  }
+  function cleanWheel(w, fresh){
+    const ok = i => i && i.label != null && /^#[0-9a-fA-F]{6}$/.test(i.color || '');
+    const cleanItem = i => ({ id: fresh ? uid() : (i.id || uid()), label: String(i.label).slice(0, 40), color: i.color });
+    return {
+      id: fresh ? uid() : (w.id || uid()),
+      name: String(w.name || 'วงล้อ').slice(0, 30),
+      items: Array.isArray(w.items) ? w.items.filter(ok).slice(0, MAX_ITEMS).map(cleanItem) : [],
+      removed: Array.isArray(w.removed) ? w.removed.filter(ok).slice(0, MAX_ITEMS).map(cleanItem) : [],
+      settings: cleanSettings(w.settings)
+    };
+  }
+
+  // <pure2>
+  function b64urlEncode(str){
+    const bytes = new TextEncoder().encode(str);
+    let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64urlDecode(s){
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    const bin = atob(s); const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  function packWheel(w){
+    return b64urlEncode(JSON.stringify([1, w.name, w.items.map(i => {
+      const k = PALETTE.indexOf(i.color);
+      return [i.label, k >= 0 ? k : i.color.slice(1)];
+    })]));
+  }
+  function unpackWheel(code){
+    const a = JSON.parse(b64urlDecode(code));
+    if (!Array.isArray(a) || a[0] !== 1 || typeof a[1] !== 'string' || !Array.isArray(a[2])) throw new Error('bad share code');
+    const items = a[2].slice(0, MAX_ITEMS).filter(p => Array.isArray(p) && typeof p[0] === 'string').map(p => {
+      let color = null;
+      if (typeof p[1] === 'number' && PALETTE[p[1]]) color = PALETTE[p[1]];
+      else if (typeof p[1] === 'string' && /^[0-9a-fA-F]{6}$/.test(p[1])) color = '#' + p[1];
+      return { label: p[0].slice(0, 40), color: color };
+    });
+    return { name: a[1].slice(0, 30) || 'วงล้อที่ได้รับ', items: items };
+  }
+  // </pure2>
+
+  function addWheelFromData(data){
+    const w = { id: uid(), name: data.name, items: [], removed: [], settings: Object.assign({}, DEFAULTS) };
+    data.items.forEach(it => w.items.push(newItem(it.label, it.color || pickColor(w.items))));
+    state.wheels.push(w); state.activeId = w.id; rotation = 0; save();
+    renderAll(); closePanels();
+    toast('เพิ่มวงล้อ "' + w.name + '" แล้ว');
+  }
+  function clearHash(){ try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+  function importSharedFromHash(){
+    const m = /^#w=([A-Za-z0-9_-]+)$/.exec(location.hash || '');
+    if (!m) return;
+    let data;
+    try { data = unpackWheel(m[1]); } catch (e) { clearHash(); toast('ลิงก์วงล้อนี้อ่านไม่ได้'); return; }
+    clearHash();
+    openModal({
+      title: 'มีคนส่งวงล้อมาให้',
+      message: '"' + data.name + '" มี ' + data.items.length + ' รายการ เพิ่มเข้าวงล้อของคุณไหม?',
+      confirmText: 'เพิ่มเลย', cancelText: 'ไม่เอา',
+      onConfirm: () => { addWheelFromData(data); }
+    });
+  }
+
+  function copyText(text){
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+      ta.remove(); return ok;
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(() => true).catch(() => fallback());
+    return Promise.resolve(fallback());
+  }
+  $('#shareWheel').addEventListener('click', () => {
+    const w = W();
+    if (!w.items.length) { toast('วงล้อนี้ยังไม่มีรายการ'); return; }
+    if (location.protocol === 'file:') {
+      openModal({ title: 'ยังแชร์เป็นลิงก์ไม่ได้', message: 'ตอนนี้เปิดไฟล์จากเครื่องโดยตรง ลิงก์ที่ได้จะใช้ได้เฉพาะเครื่องนี้ ให้นำแอปขึ้นเว็บก่อน หรือใช้ "สำรองข้อมูล" เพื่อส่งไฟล์ให้คนอื่นแทน', confirmText: null, cancelText: 'ปิด' });
+      return;
+    }
+    const url = location.origin + location.pathname + '#w=' + packWheel(w);
+    openModal({
+      title: 'แชร์วงล้อ "' + w.name + '"',
+      message: 'คนที่เปิดลิงก์นี้จะได้รายการชุดเดียวกัน ไม่ต้องสมัครสมาชิก',
+      fields: [{ key: 'url', label: 'ลิงก์', value: url }],
+      confirmText: 'คัดลอกลิงก์', cancelText: 'ปิด',
+      secondary: typeof navigator.share === 'function' ? { text: 'แชร์…', onClick: () => { navigator.share({ title: w.name, url: url }).catch(() => {}); } } : null,
+      onConfirm: () => { copyText(url).then(ok => toast(ok ? 'คัดลอกลิงก์แล้ว' : 'คัดลอกไม่สำเร็จ ลองกดค้างที่ช่องลิงก์')); return false; }
+    });
+  });
+
+  $('#exportData').addEventListener('click', () => {
+    const payload = { app: 'spin-wheel', version: 2, exportedAt: new Date().toISOString(), wheels: state.wheels };
+    const blob = new Blob([JSON.stringify(payload, null, 1)], { type: 'application/json' });
+    const d = new Date(), p2 = n => String(n).padStart(2, '0');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'spin-wheel-backup-' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    toast('ดาวน์โหลดไฟล์สำรองแล้ว');
+  });
+  const importFile = $('#importFile');
+  $('#importData').addEventListener('click', () => { if (guardSpin()) return; importFile.click(); });
+  importFile.addEventListener('change', () => {
+    const file = importFile.files && importFile.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast('ไฟล์ใหญ่เกินไป'); importFile.value = ''; return; }
+    const fr = new FileReader();
+    fr.onload = () => {
+      try {
+        const data = JSON.parse(String(fr.result));
+        if (!data || !Array.isArray(data.wheels) || !data.wheels.length) throw new Error('no wheels');
+        const wheels = data.wheels.slice(0, 50).map(w => cleanWheel(w, true));
+        state.wheels = state.wheels.concat(wheels);
+        state.activeId = wheels[0].id; rotation = 0; save();
+        renderAll(); closePanels();
+        toast('นำเข้า ' + wheels.length + ' วงล้อแล้ว');
+      } catch (e) { toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองของวงล้อสุ่ม'); }
+      importFile.value = '';
+    };
+    fr.onerror = () => { toast('อ่านไฟล์ไม่สำเร็จ'); importFile.value = ''; };
+    fr.readAsText(file);
+  });
+
+  /* install as app */
+  let deferredInstall = null;
+  const installRow = $('#installApp');
+  const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+  function refreshInstallRow(){ installRow.hidden = isStandalone() || location.protocol === 'file:' || !(deferredInstall || isIOS); }
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; refreshInstallRow(); });
+  window.addEventListener('appinstalled', () => { deferredInstall = null; refreshInstallRow(); toast('ติดตั้งแอปเรียบร้อยแล้ว'); });
+  installRow.addEventListener('click', () => {
+    if (deferredInstall) {
+      deferredInstall.prompt();
+      Promise.resolve(deferredInstall.userChoice).then(() => { deferredInstall = null; refreshInstallRow(); });
+    } else {
+      openModal({ title: 'ติดตั้งบน iPhone / iPad', message: 'เปิดหน้านี้ใน Safari แล้วแตะปุ่มแชร์ (สี่เหลี่ยมมีลูกศรชี้ขึ้น) จากนั้นเลือก "เพิ่มลงในหน้าจอโฮม"', confirmText: null, cancelText: 'เข้าใจแล้ว' });
+    }
+  });
+
+  /* offline (service worker) */
+  let swState = 'unsupported';
+  function updateNetNote(){
+    const msg = {
+      ready: 'พร้อมใช้งานออฟไลน์แล้ว ✓ เปิดได้แม้ไม่มีอินเทอร์เน็ต',
+      registering: 'กำลังเตรียมโหมดออฟไลน์… เปิดค้างไว้ครู่หนึ่งขณะมีอินเทอร์เน็ต',
+      file: 'เปิดจากไฟล์ในเครื่อง ใช้ออฟไลน์ได้อยู่แล้ว (แต่ติดตั้งเป็นแอปไม่ได้ ต้องเปิดผ่านลิงก์เว็บ)',
+      unsupported: 'เบราว์เซอร์นี้ไม่รองรับการติดตั้งโหมดออฟไลน์'
+    }[swState] || '';
+    $('#netNote').textContent = msg + (navigator.onLine === false ? ' · ตอนนี้ไม่มีอินเทอร์เน็ต' : '');
+  }
+  function registerSW(){
+    if (location.protocol === 'file:') { swState = 'file'; return; }
+    if (!('serviceWorker' in navigator)) { swState = 'unsupported'; return; }
+    swState = 'registering';
+    navigator.serviceWorker.register('sw.js').catch(() => { swState = 'unsupported'; updateNetNote(); });
+    navigator.serviceWorker.ready.then(() => {
+      const first = !navigator.serviceWorker.controller;
+      swState = 'ready'; updateNetNote();
+      if (first) toast('พร้อมใช้งานออฟไลน์แล้ว');
+    });
+  }
+  window.addEventListener('online', updateNetNote);
+  window.addEventListener('offline', updateNetNote);
+  window.addEventListener('hashchange', importSharedFromHash);
+
+  /* ================= boot ================= */
+  function renderAll(){
+    renderTitle(); renderWheel(); renderToolbar(); renderSettings(); renderWheelsList();
+    setResultIdle();
+  }
+  renderAll();
+  registerSW();
+  importSharedFromHash();
+})();
+</script>
+</body>
+</html>
