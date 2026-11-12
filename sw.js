@@ -1,6 +1,6 @@
 /* Service worker: ทำให้วงล้อสุ่มใช้งานออฟไลน์ได้
    เมื่อแก้ไฟล์ใดๆ แล้วนำขึ้นเว็บใหม่ ให้เปลี่ยนเลข VERSION ด้านล่าง เพื่อให้เครื่องผู้ใช้ดึงไฟล์ชุดใหม่ */
-const VERSION = '1';
+const VERSION = '2';
 const CACHE = 'spin-wheel-' + VERSION;
 const ASSETS = [
   "./",

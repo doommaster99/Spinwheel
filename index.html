@@ -1,10 +1,13 @@
 <!DOCTYPE html>
+<!-- © 2026 อุดม นุพันธ์. สงวนลิขสิทธิ์ทุกประการ -->
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#F1F1F8" />
 <meta name="description" content="วงล้อสุ่มรายชื่อและตัวเลข ใช้ได้แม้ไม่มีอินเทอร์เน็ต" />
+<meta name="author" content="อุดม นุพันธ์" />
+<meta name="copyright" content="© 2026 อุดม นุพันธ์. สงวนลิขสิทธิ์ทุกประการ" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="วงล้อสุ่ม" />
@@ -28,10 +31,10 @@
     --danger:#E5484D;
     --shadow:0 6px 22px rgba(70,80,140,.12);
     --font:'WheelSans','Noto Sans Thai','Leelawadee UI','Thonburi','Sarabun',Tahoma,system-ui,sans-serif;
-    --wheel:max(220px, min(calc(100vw - 28px), 600px, calc(100vh - 300px)));
+    --wheel:max(220px, min(calc(100vw - 28px), 600px, calc(100vh - 322px)));
   }
   @supports (height:100dvh){
-    :root{ --wheel:max(220px, min(calc(100vw - 28px), 600px, calc(100dvh - 300px))); }
+    :root{ --wheel:max(220px, min(calc(100vw - 28px), 600px, calc(100dvh - 322px))); }
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;height:100%;}
@@ -267,6 +270,11 @@
   .toast.show{opacity:1;transform:translate(-50%,0);}
   #confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:75;}
 
+  .app-foot{flex:none;text-align:center;color:var(--muted);font-size:11px;font-weight:600;line-height:1.5;padding:0 8px 2px;opacity:.9;user-select:none;}
+  .about{display:flex;align-items:center;gap:14px;padding:6px 6px 8px;}
+  .about img{width:56px;height:56px;border-radius:14px;box-shadow:0 4px 12px rgba(60,70,130,.25);flex:none;}
+  .about-name{font-weight:900;font-size:18px;line-height:1.4;}
+  .about-copy{color:var(--muted);font-size:12px;font-weight:600;line-height:1.5;}
   .group-card .row-btn + .row-btn{border-top:1px solid var(--line);}
   .net-note{margin:0;padding:12px 18px 14px;color:var(--muted);font-size:13px;font-weight:600;line-height:1.5;border-top:1px solid var(--line);}
   @media (max-width:420px){
@@ -316,6 +324,7 @@
     <button class="tool" id="btnAdd" aria-label="เพิ่มรายการ"><i data-icon="plus" data-size="30"></i></button>
     <button class="tool" id="btnEdit" aria-label="แก้ไขรายการ"><i data-icon="pencil" data-size="26"></i></button>
   </nav>
+  <footer class="app-foot">© 2026 อุดม นุพันธ์. สงวนลิขสิทธิ์ทุกประการ</footer>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -356,6 +365,13 @@
       <p class="net-note" id="netNote"></p>
     </div>
     <input type="file" id="importFile" accept=".json,application/json" hidden>
+    <div class="about">
+      <img src="icons/icon-192.png" width="56" height="56" alt="ไอคอนวงล้อสุ่ม">
+      <div>
+        <div class="about-name">วงล้อสุ่ม</div>
+        <div class="about-copy">© 2026 อุดม นุพันธ์. สงวนลิขสิทธิ์ทุกประการ</div>
+      </div>
+    </div>
   </div>
 </aside>
 
